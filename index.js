@@ -2,7 +2,7 @@ const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
 const ejsMate = require('ejs-mate');
-const {campgroundSchema} = require('./schemas.js')
+const {campgroundSchema, reviewSchema} = require('./schemas.js')
 const catchAsync = require("./utilities/catchAsync");
 const ExpressError = require("./utilities/ExpressError");
 const methodOverride = require("method-override");
@@ -10,8 +10,10 @@ const app = express();
 const port = 3000;
 
 const campGround = require("./models/campground");
-const { errorMonitor } = require("events");
-const { resourceLimits } = require("worker_threads");
+const Review = require('./models/review');
+// const { redirect } = require("express/lib/response");
+// const { errorMonitor } = require("events");
+// const { resourceLimits } = require("worker_threads");
 
 
 
@@ -43,13 +45,26 @@ const validateCampground = (req, res, next)=>{
   const {error} = campgroundSchema.validate(req.body);
   if(error){
     //  const msg = error.details.map(el => el.message).join(',');
-     const errorD = error.details;
-     const msg =errorD.map(el => el.message).join();
+    const errorD = error.details;
+    const msg =errorD.map(el => el.message).join();
     console.log(msg)
     throw new ExpressError(msg,400)
   }else{
     next();
   }
+}
+debugger
+const validateReview = (req, res, next)=>{
+  const {error} = reviewSchema.validate(req.body);
+  if(error){
+    const errorD = error.details;
+    const msg =errorD.map(el => el.message).join();
+    console.log(msg)
+    throw new ExpressError(msg,400)
+  }else{
+    next();
+  }
+
 }
 
 
@@ -77,6 +92,8 @@ app.post("/campgrounds", validateCampground, catchAsync(async (req, res, next) =
 
 app.get("/campgrounds/:id", catchAsync(async (req, res) => {
   const campground = await campGround.findById(req.params.id);
+  console.log(req.params.id)
+  console.log(campground)
   res.render("campgrounds/show", { campground });
 }));
 
@@ -98,10 +115,27 @@ app.delete('/campgrounds/:id', catchAsync(async (req, res) => {
   res.redirect('/campgrounds');
 }));
 
+
+// REVIEW
+
+
+app.post('/campgrounds/:id/reviews', validateReview, catchAsync(async (req,res) => {
+
+  const campground = await campGround.findById(req.params.id);
+  const review = new Review(req.body.review);
+  campground.reviews.push(review);
+  await review.save();
+  await campground.save();
+  res.redirect(`/campgrounds/${campground._id}`);
+}));
+
+
 app.all('*', (req,res,next)=>{
   next(new ExpressError('Sorry, I dunno.?', 404))
 });
 
+
+// 623ab715ef7e6885f56d3df1
 
 app.use((err, req, res, next)=>{
   const{statusCode = 500} = err
